@@ -1,0 +1,198 @@
+{
+  "suite": "controlled_report_validation_v1",
+  "purpose": "使用真实 Q004 数字回归验证报告的数值、排名、粒度、术语、因果与行动边界；不调用LLM。",
+  "category": "Furniture",
+  "reference": {
+    "sales": 741999.7953,
+    "profit": 18451.2728,
+    "profit_margin": 0.024866951334588865,
+    "order_count": 1764
+  },
+  "evidence": {
+    "Q001": {
+      "columns": ["total_sales", "total_profit", "overall_margin", "total_orders"],
+      "rows": [[741999.7953, 18451.2728, 0.024866951334588865, 1764]],
+      "truncated": false
+    },
+    "Q003": {
+      "sql": "SELECT AVG(discount) AS avg_discount, MIN(discount) AS min_discount, MAX(discount) AS max_discount, COUNT(*) AS row_count FROM orders WHERE category = 'Furniture' AND sub_category = 'Tables';",
+      "columns": ["avg_discount", "min_discount", "max_discount", "row_count"],
+      "rows": [[0.2612852664576803, 0.0, 0.5, 319]],
+      "truncated": false
+    },
+    "Q004": {
+      "columns": ["discount_bin", "sales", "profit", "margin", "order_count"],
+      "rows": [
+        ["61%+", 2459.382, -3894.9394, -1.5837065571757458, 15],
+        ["41-60%", 33113.144, -21308.9653, -0.6435198451708481, 184],
+        ["21-40%", 159578.2148, -29273.8514, -0.18344516158856042, 299],
+        ["0-20%", 290823.7845, 14795.9525, 0.05087600563839028, 654],
+        ["No Discount", 256025.27, 58133.0764, 0.22705991639028444, 739]
+      ],
+      "truncated": false
+    }
+  },
+  "base_report": {
+    "title": "Furniture 观察性盈利分析",
+    "scope": "Furniture",
+    "status": "complete",
+    "data_grain": "一条商品交易明细；row_id唯一，order_id可重复",
+    "evidence_level": "observational_descriptive",
+    "causal_effect_estimated": false,
+    "summary": "Furniture 样本整体 profit 为正；折扣分组仅用于观察性描述。",
+    "core_metrics": {
+      "sales": 741999.7953,
+      "profit": 18451.2728,
+      "profit_margin": 0.024866951334588865,
+      "order_count": 1764
+    },
+    "facts": [
+      {
+        "statement": "Furniture 总销售额为 741999.7953。",
+        "claim_type": "descriptive",
+        "query_id": "Q001",
+        "row": 0,
+        "column": "total_sales",
+        "value": 741999.7953
+      },
+      {
+        "statement": "按 profit 金额比较，21-40% 是 profit 最低的折扣组。",
+        "claim_type": "descriptive",
+        "query_id": "Q004",
+        "row": 2,
+        "column": "discount_bin",
+        "value": "21-40%",
+        "comparison": {"column": "profit", "direction": "min"}
+      }
+    ],
+    "hypotheses": [
+      {
+        "statement": "折扣组差异可能受商品和地区结构影响。",
+        "status": "unverified",
+        "required_evidence": ["商品、地区与折扣的交叉汇总"]
+      }
+    ],
+    "actions": [
+      {
+        "description": "核查商品和地区结构后，由业务负责人决定是否设计试验。",
+        "action_type": "investigate",
+        "requires_human_decision": true
+      }
+    ],
+    "limitations": ["观察性历史数据，没有反事实或因果识别。"]
+  },
+  "cases": [
+    {
+      "id": "EVAL-001",
+      "dimension": "valid_control",
+      "description": "正确的观察性报告应通过。",
+      "overrides": {},
+      "expected_valid": true
+    },
+    {
+      "id": "EVAL-002",
+      "dimension": "core_metric",
+      "description": "错误核心销售额应被拒绝。",
+      "overrides": {"core_metrics.sales": 999},
+      "expected_valid": false,
+      "expected_error_contains": "核心指标 sales"
+    },
+    {
+      "id": "EVAL-003",
+      "dimension": "ranking",
+      "description": "真实失败：41-60% 不是 profit 金额最低组。",
+      "overrides": {
+        "facts.1.statement": "按 profit 金额比较，41-60% 是 profit 最低的折扣组。",
+        "facts.1.row": 1,
+        "facts.1.value": "41-60%"
+      },
+      "expected_valid": false,
+      "expected_error_contains": "不是声明指标"
+    },
+    {
+      "id": "EVAL-004",
+      "dimension": "ranking_contract",
+      "description": "排名主张缺少结构化比较字段应被拒绝。",
+      "overrides": {"facts.1.comparison": {"$delete": true}},
+      "expected_valid": false,
+      "expected_error_contains": "comparison.column"
+    },
+    {
+      "id": "EVAL-005",
+      "dimension": "grain",
+      "description": "把商品明细误写成每行一张订单应被拒绝。",
+      "overrides": {"data_grain": "每行一张订单"},
+      "expected_valid": false,
+      "expected_error_contains": "data_grain"
+    },
+    {
+      "id": "EVAL-006",
+      "dimension": "metric_terminology",
+      "description": "profit 口径未核对时改称为毛利应被拒绝。",
+      "overrides": {"summary": "Furniture 毛利表现较弱。"},
+      "expected_valid": false,
+      "expected_error_contains": "profit 口径未核对"
+    },
+    {
+      "id": "EVAL-007",
+      "dimension": "causal_claim",
+      "description": "当前观察性工具不接受因果类事实。",
+      "overrides": {"facts.1.claim_type": "causal"},
+      "expected_valid": false,
+      "expected_error_contains": "claim_type"
+    },
+    {
+      "id": "EVAL-008",
+      "dimension": "causal_effect",
+      "description": "声称已估计因果效应应被拒绝。",
+      "overrides": {"causal_effect_estimated": true},
+      "expected_valid": false,
+      "expected_error_contains": "causal_effect_estimated"
+    },
+    {
+      "id": "EVAL-009",
+      "dimension": "hypothesis",
+      "description": "未验证假设不能标记为已确认。",
+      "overrides": {"hypotheses.0.status": "confirmed"},
+      "expected_valid": false,
+      "expected_error_contains": "unverified"
+    },
+    {
+      "id": "EVAL-010",
+      "dimension": "action_boundary",
+      "description": "观察性报告不能提交无人工决策的直接执行动作。",
+      "overrides": {
+        "actions.0.action_type": "execute",
+        "actions.0.requires_human_decision": false
+      },
+      "expected_valid": false,
+      "expected_error_contains": "人工决策"
+    },
+    {
+      "id": "EVAL-011",
+      "dimension": "scalar_aggregate_ranking",
+      "description": "单行 SQL MAX 聚合已直接计算极值，不需要行间 comparison。",
+      "overrides": {
+        "facts.1": {
+          "statement": "Tables 子类最高折扣率为 0.5。",
+          "claim_type": "descriptive",
+          "query_id": "Q003",
+          "row": 0,
+          "column": "max_discount",
+          "value": 0.5
+        }
+      },
+      "expected_valid": true
+    },
+    {
+      "id": "EVAL-012",
+      "dimension": "unsupported_money_counterfactual",
+      "description": "未估计因果效应时，精确货币增量预测应被拒绝。",
+      "overrides": {
+        "summary": "若将 Tables 所有折扣归零，理论利润可提升约2.2万元。"
+      },
+      "expected_valid": false,
+      "expected_error_contains": "精确货币增量预测"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+# 本文件防止密钥、本地运行数据和环境被意外提交；不是加密或访问控制。
+.env
+.env.*
+.venv/
+__pycache__/
+*.pyc
+data/*.csv
+data/source_manifest.json
+runs/
+# 本地非公开材料，不属于项目交付。
+docs/09_阶段总结与*.md
+private_notes/
